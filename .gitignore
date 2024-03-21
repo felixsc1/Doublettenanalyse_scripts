@@ -5,7 +5,6 @@
 data/
 output/x
 *.xlsx
-*.zip
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
