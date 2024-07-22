@@ -298,14 +298,14 @@ def add_produkte_columns(df_organisationen, organisationsrollen_df):
     )
 
     # Calculate counts for 'Produkt_Adressant'
-    adressant_counts = (
-        organisationsrollen_df["Rechnungsempfaenger_RefID"].value_counts()
-        + organisationsrollen_df["Korrespondenzempfaenger_RefID"].value_counts()
-    )
-    # Map these counts to df_organisationen
-    df_organisationen["Produkt_Adressant"] = (
-        df_organisationen["ReferenceID"].map(adressant_counts).fillna(0).astype(int)
-    )
+
+    # Calculate counts for each reference ID separately, filling missing values with 0
+    rechnungsempfaenger_counts = organisationsrollen_df["Rechnungsempfaenger_RefID"].value_counts()
+    korrespondenzempfaenger_counts = organisationsrollen_df["Korrespondenzempfaenger_RefID"].value_counts()
+    # Combine the Series, ensuring that missing entries in one Series do not nullify existing counts from the other
+    adressant_counts = rechnungsempfaenger_counts.add(korrespondenzempfaenger_counts, fill_value=0)
+    # Map these combined counts to df_organisationen
+    df_organisationen["Produkt_Adressant"] = df_organisationen["ReferenceID"].map(adressant_counts).fillna(0).astype(int)
 
     return df_organisationen
 

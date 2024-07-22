@@ -317,7 +317,7 @@ def parallel_apply(
 
 
 def get_product_information(df_input, organisationsrollen_df, produktname):
-    # uses parallel processing to utilize 100% CPU, took about 13-16min for one produkt.
+    # uses parallel processing to utilize 100% CPU, takes several minutes for one produkt.
 
     # Pre-filter organisationsrollen_df by produktname
     full_id = produkte_dict_name_first.get(produktname, None)
@@ -1155,3 +1155,55 @@ def find_email_doubletten(df, portal=True):
         ]
     
     return final_df
+
+
+# New Performance Test Functions
+
+def find_frequent_roles(organisationsrollen_df):
+    # Works for Organisationen and Personen
+    def create_role_df(role, role_ref_id):
+        # Count occurrences of each unique ID in the specified role
+        id_counts = organisationsrollen_df[role_ref_id].value_counts()
+
+        # Filter IDs that appear more than 1000 times
+        frequent_ids = id_counts[id_counts >= 1000].index
+
+        # Initialize the result DataFrame
+        result_df = pd.DataFrame({
+            role_ref_id: frequent_ids,
+            "Total_Count": id_counts[frequent_ids]
+        })
+
+        # Add the role column
+        result_df[role] = result_df[role_ref_id].apply(
+            lambda x: organisationsrollen_df.loc[
+                organisationsrollen_df[role_ref_id] == x, role
+            ].iloc[0]
+        )
+
+        # Add columns for each key in produkte_dict_name_first
+        for produkt, full_id in produkte_dict_name_first.items():
+            result_df[produkt] = result_df[role_ref_id].apply(
+                lambda x: organisationsrollen_df[
+                    (organisationsrollen_df[role_ref_id] == x) & 
+                    (organisationsrollen_df["FullID"] == full_id)
+                ].shape[0]
+            )
+
+        # Reorder columns
+        result_df = result_df[[role, role_ref_id, "Total_Count"] + list(produkte_dict_name_first.keys())]
+        
+        # Remove columns where all counts are 0
+        result_df = result_df.loc[:, (result_df != 0).any(axis=0)]
+
+        # Reset index to have a numeric index
+        result_df.reset_index(drop=True, inplace=True)
+
+        return result_df
+
+    # Create DataFrames for each role
+    inhaber_df = create_role_df("Inhaber", "Inhaber_RefID")
+    rechnungsempfaenger_df = create_role_df("Rechnungsempfaenger", "Rechnungsempfaenger_RefID")
+    korrespondenzempfaenger_df = create_role_df("Korrespondenzempfaenger", "Korrespondenzempfaenger_RefID")
+
+    return inhaber_df, rechnungsempfaenger_df, korrespondenzempfaenger_df

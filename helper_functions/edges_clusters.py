@@ -334,7 +334,15 @@ def create_edges_and_clusters(file_paths):
     return
 
 
-def find_name_adresse_doubletten(df, organisationen=True):
+def abbreviate_first_name(name):
+    name = " ".join(name.split())  # Remove extra spaces
+    # name = name.title()  # Standardize case
+    parts = name.split()
+    if len(parts) > 1 and not parts[0].endswith('.'):
+        parts[0] = parts[0][0] + '.'  # Replace the first name with its abbreviation
+    return ' '.join(parts)
+
+def find_name_adresse_doubletten(df, organisationen=True, abbreviated_first_name=False):
     """
     A cluster here is just any group of organizations with exact match in Name and Adresse (email irrelevant). Used for Doubletten analyses.
     """
@@ -342,7 +350,11 @@ def find_name_adresse_doubletten(df, organisationen=True):
     if organisationen:
         df['cluster_id'] = df.groupby(['Name_Zeile2', 'address_full']).ngroup()
     else:
-        df['cluster_id'] = df.groupby(['Name', 'address_full']).ngroup()
+        if abbreviated_first_name:
+            df["Name_abbrev"] = df["Name"].apply(abbreviate_first_name)
+            df['cluster_id'] = df.groupby(['Name_abbrev', 'address_full']).ngroup()
+        else:
+            df['cluster_id'] = df.groupby(['Name', 'address_full']).ngroup()
 
     # Keep only groups with at least 2 identical rows
     df = df[df.groupby('cluster_id')['cluster_id'].transform('size') > 1]
