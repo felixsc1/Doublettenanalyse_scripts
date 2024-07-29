@@ -342,6 +342,7 @@ def abbreviate_first_name(name):
         parts[0] = parts[0][0] + '.'  # Replace the first name with its abbreviation
     return ' '.join(parts)
 
+
 def find_name_adresse_doubletten(df, organisationen=True, abbreviated_first_name=False):
     """
     A cluster here is just any group of organizations with exact match in Name and Adresse (email irrelevant). Used for Doubletten analyses.

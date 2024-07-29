@@ -59,6 +59,10 @@ def set_master_flag(df):
 
     # Assign the 'master' column directly to the original DataFrame
     result_df["master"] = sorted_df["master"]
+    
+    # Create the 'master_ID' column
+    master_ids = sorted_df[sorted_df["master"] == "X"].set_index("cluster_id")["ReferenceID"]
+    result_df["masterID"] = result_df["cluster_id"].map(master_ids)
 
     return result_df
 
@@ -140,3 +144,52 @@ def final_touch_batch(df_dict, cols_to_keep, two_roles=False, alphanumeric=False
             result_dict[produktname] = final_touch(value, cols_to_keep, two_roles, alphanumeric=alphanumeric)
 
     return result_dict
+
+
+from .hardcoded_values import produkte_dict_element_typ
+
+def organisationsrollen_add_inhaber_typ_and_produkt_typ(df_rollen, df_personen, df_organisationen):
+    # Create a set for faster lookup
+    personen_ids = set(df_personen["ReferenceID"])
+    organisationen_ids = set(df_organisationen["ReferenceID"])
+    
+    def get_typ(ref_id):
+        if ref_id in personen_ids:
+            return "Person"
+        elif ref_id in organisationen_ids:
+            return "Organisation"
+        else:
+            return "Unbekannt"
+    
+    def get_produkt_typ(full_id):
+        return produkte_dict_element_typ.get(full_id, None)
+    def get_produkt_name(full_id):
+        return produkte_dict.get(full_id, None)
+    
+    df_rollen["Inhaber_Typ"] = df_rollen["Inhaber_RefID"].apply(get_typ)
+    df_rollen["Rechnungsempfaenger_Typ"] = df_rollen["Rechnungsempfaenger_RefID"].apply(get_typ)
+    df_rollen["Korrespondenzempfaenger_Typ"] = df_rollen["Korrespondenzempfaenger_RefID"].apply(get_typ)
+    df_rollen["Produkt_Typ"] = df_rollen["FullID"].apply(get_produkt_typ)
+    df_rollen["Produkt_Name"] = df_rollen["FullID"].apply(get_produkt_name)
+    
+    # The following is just a check if there are rows with a mixture of Person and Organisation:
+    # Filter out rows where any of the types is 'Unbekannt'
+    filtered_df = df_rollen[
+        (df_rollen["Inhaber_Typ"] != "Unbekannt") &
+        (df_rollen["Rechnungsempfaenger_Typ"] != "Unbekannt") &
+        (df_rollen["Korrespondenzempfaenger_Typ"] != "Unbekannt") &
+        (df_rollen["Produkt_Typ"] != "Unbekannt")
+    ]
+    
+    # Count rows where there is a mixture of 'Person' and 'Organisation'
+    def is_mixed(row):
+        types = {row["Inhaber_Typ"], row["Rechnungsempfaenger_Typ"], row["Korrespondenzempfaenger_Typ"]}
+        return "Person" in types and "Organisation" in types
+    
+    mixed_typ_count = filtered_df.apply(is_mixed, axis=1).sum()
+    
+    print(f"Number of rows with a mixture of 'Person' and 'Organisation': {mixed_typ_count}")
+    
+    
+    return df_rollen
+    

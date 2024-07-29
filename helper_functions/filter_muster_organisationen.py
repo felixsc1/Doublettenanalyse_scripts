@@ -359,6 +359,7 @@ def batch_process_produkte(df, organisationsrollen_df, produktnamen):
             print(f"❌ No Doubletten with 2 roles found!")
         else:
             result_2[produktname] = cleaned_product_info_2
+            
     return result_3, result_2
 
 
@@ -1053,6 +1054,8 @@ def organisationsrollen_filter_and_format_batch(
     Returns a dictionary with key = Produktname and value = list of dataframes (Inhaber_separat, etc.)
     """
     result_dict = {}
+    statistics_data = []
+    
     for key, df in df_dict.items():
         df = set_master_flag(df)  # is needed for re-ordering
         dataframes, names = organisationsrollen_filter_and_format(
@@ -1067,8 +1070,14 @@ def organisationsrollen_filter_and_format_batch(
             result_dict[key] = nested_dict
         else:
             result_dict[key] = {}  # Or some other placeholder if no data is present
+    
+    # Calculate statistics
+        doubletten_count = sum(df["cluster_id"].nunique() for df in dataframes)
+        statistics_data.append({"produkte": key, "Doubletten": doubletten_count})
 
-    return result_dict
+    # Create statistics DataFrame
+    statistics_df = pd.DataFrame(statistics_data)
+    return result_dict, statistics_df
 
 
 # ---------  Filters for other analyses  ---------
