@@ -7,7 +7,7 @@ from .hardcoded_values import produkte_dict_name_first
 
 
 def general_exclusion_criteria(
-    df, no_Produkte=True, no_Geschaeftspartner=True, no_Servicerole=True
+    df, no_Produkte=True, no_Geschaeftspartner=True, no_Servicerole=True, only_with_Geschaeftspartner=False
 ):
     # Apply conditions to each row
     if no_Produkte:
@@ -16,6 +16,13 @@ def general_exclusion_criteria(
         df = df[~df["Geschaeftspartner_list"].apply(lambda gp: len(gp) != 0)]
     if no_Servicerole:
         df = df[df["Servicerole_count"] == 0]
+        
+    # Filters on the group level
+    # At least one member of a cluster must have a Geschaeftspartner connection
+    if only_with_Geschaeftspartner:
+        df = df.groupby("cluster_id").filter(
+            lambda x: x["Geschaeftspartner_list"].apply(lambda gp: len(gp) > 0).any()
+        )
 
     # Filter out groups with less than 2 members
     return df[df.groupby("cluster_id")["cluster_id"].transform("size") >= 2]
@@ -28,11 +35,13 @@ def general_exclusion_criteria_personen(
     no_Servicerole=True,
     only_physisch=False,
     only_mitarbeiter=True,
+    only_with_Geschaeftspartner=False,
 ):
     """
     Removes entries that don't match a certain criterion. If this results in a group of Doubletten having only one member, the whole group is removed.
     Note we currently look at Personen that ONLY have a single Verknüpfung to one organisation. In future cleanup may want to relax that, though only 15 cases in doubletten (300 total).
     """
+    # Filters on the individual level
     if no_Produkte:
         df = df[df["Produkt_rolle"].apply(lambda x: len(x) == 0)]
     if no_Geschaeftspartner:
@@ -54,12 +63,19 @@ def general_exclusion_criteria_personen(
         ]
     else:
         # Alternative: Can have one Mitarbeiter or one Administrator connection
+        # the no_geschaeftspartner parameter just allows Geschaeftspartner optionally, this one enforces them.
         df = df[
             df["Verknuepfungsart_list"].apply(
                 lambda x: len(x) == 1
                 and (x[0] == "Mitarbeiter" or x[0] == "Administrator")
             )
         ]
+    # Filters on the group level
+    # At least one member of a cluster must have a Geschaeftspartner connection
+    if only_with_Geschaeftspartner:
+        df = df.groupby("cluster_id").filter(
+            lambda x: x["Geschaeftspartner_list"].apply(lambda gp: len(gp) > 0).any()
+        )
 
     # Remove groups with only one member left after filtering
     df = df.groupby("cluster_id").filter(lambda x: len(x) > 1)
@@ -1083,7 +1099,7 @@ def organisationsrollen_filter_and_format_batch(
 # ---------  Filters for other analyses  ---------
 
 
-def find_portal_vs_physisch_doublette(df, organisationen=False, strict_email=True):
+def find_portal_vs_physisch_doublette(df, organisationen=False, strict_email=True, only_Geschaeftspartner=False):
     """
     Find doubletten (same name, adresse, email) that are present as physisch and portal
     (in case of personen irrespective of their connections to organisationen).
@@ -1121,6 +1137,12 @@ def find_portal_vs_physisch_doublette(df, organisationen=False, strict_email=Tru
         lambda x: (x["Versandart"] == "Portal").any()
         and (x["Versandart"] == "Physisch").any()
     )
+    
+    # If only_Geschaeftspartner is True, add additional condition
+    if only_Geschaeftspartner:
+        valid_clusters &= filtered_df.groupby("cluster_id").apply(
+            lambda x: x["Geschaeftspartner_list"].apply(lambda gp: len(gp) > 0).any()
+        )
 
     # Filter out groups that don't meet both conditions
     final_df = filtered_df[
@@ -1130,13 +1152,14 @@ def find_portal_vs_physisch_doublette(df, organisationen=False, strict_email=Tru
     return final_df
 
 
-def find_email_doubletten(df, portal=True):
+def find_email_doubletten(df, portal=True, only_with_Geschaeftspartner=False):
     """
     Simplified version of find_portal_vs_physisch_doublette().
     Doublette is simply defined by same email address.
     If portal=True, must have at least one member with Versandart == Portal, may or may not have others with Physisch.
     If portal=False, all must have Versandart == Physisch.
     They don't have to be connected to same organisation.
+    If only_with_Geschaeftspartner=True, at least one member in each group must have Geschaeftspartner_list > 0.
     """
     # We don't consider empty emails here
     df = df[df["EMailAdresse"] != ""]
@@ -1152,16 +1175,20 @@ def find_email_doubletten(df, portal=True):
         valid_clusters = filtered_df.groupby("cluster_id").apply(
             lambda x: (x["Versandart"] == "Portal").any()
         )
-        final_df = filtered_df[
-            filtered_df["cluster_id"].isin(valid_clusters[valid_clusters].index)
-        ]
     else:
         valid_clusters = filtered_df.groupby("cluster_id").apply(
             lambda x: (x["Versandart"] == "Physisch").all()
         )
-        final_df = filtered_df[
-            filtered_df["cluster_id"].isin(valid_clusters[valid_clusters].index)
-        ]
+
+    # If only_with_Geschaeftspartner is True, add additional condition
+    if only_with_Geschaeftspartner:
+        valid_clusters &= filtered_df.groupby("cluster_id").apply(
+            lambda x: x["Geschaeftspartner_list"].apply(lambda gp: len(gp) > 0).any()
+        )
+
+    final_df = filtered_df[
+        filtered_df["cluster_id"].isin(valid_clusters[valid_clusters].index)
+    ]
     
     return final_df
 

@@ -365,14 +365,17 @@ def get_geschaeftspartner(input_df, folder_path):
     df gets a new column "Geschaeftspartner" which contains a list of all matching partners.
     """
     # Create the "Geschaeftspartner" column in the input_df
+    # print(f"Starting get_geschaeftspartner function with {len(input_df)} rows in input_df")
     input_df["Geschaeftspartner"] = [[] for _ in range(len(input_df))]
 
     # List all xlsx files in the specified directory
     xlsx_files = glob.glob(f"{folder_path}/*.xlsx")
+    # print(f"Found {len(xlsx_files)} xlsx files in {folder_path}")
 
     # Helper function to check if a ReferenceID exists in any of the dfs and return its name(s)
     def check_reference(reference, df, partner_name):
         if reference in df["ReferenceID"].values:
+            # print(f"Found {partner_name} for {reference}")
             return [partner_name]
         return []
 
@@ -385,14 +388,21 @@ def get_geschaeftspartner(input_df, folder_path):
             .rsplit("_", 1)[-1]
             .split(".")[0]
         )
+        # print(f"Processing file: {xlsx_file}, partner_name: {partner_name}")
 
         # Load the dataframe
         df = pd.read_excel(xlsx_file)
+        # print(f"Loaded dataframe with {len(df)} rows")
 
         # Loop through each row in input_df and populate the "Geschaeftspartner" column
+        matches_found = 0
         for index, row in input_df.iterrows():
             partners = check_reference(row["ReferenceID"], df, partner_name)
+            if partners:
+                matches_found += 1
             input_df.at[index, "Geschaeftspartner"].extend(partners)
+
+        # print(f"Found {matches_found} matches for {partner_name}")
 
     return input_df
 
@@ -531,7 +541,7 @@ def calculate_scores_personen(df, physisch=False):
     return df
 
 
-def raw_cleanup(file_paths_original, remove_personen_Sonstiges=True, skip_hyperlink_step=False):
+def raw_cleanup(file_paths_original, raw_data_directory, remove_personen_Sonstiges=True, skip_hyperlink_step=False):
     """
     Main function that calls basic_cleanup(), and various others.
     Also integrates other Expertensuchen such as Serviceroles into df_personen, df_organisationen.
@@ -635,9 +645,9 @@ def raw_cleanup(file_paths_original, remove_personen_Sonstiges=True, skip_hyperl
     # GESCHÄFTSPARTNER
     df_organisationen = get_geschaeftspartner(
         df_organisationen,
-        "data/mandanten/organisationen",
+        os.path.join(raw_data_directory, "mandanten/organisationen"),
     )
-    df_personen = get_geschaeftspartner(df_personen, "data/mandanten/personen")
+    df_personen = get_geschaeftspartner(df_personen, os.path.join(raw_data_directory, "mandanten/personen"))
 
     # Processing list column, to have both string and true list representation.
     columns_to_convert = [

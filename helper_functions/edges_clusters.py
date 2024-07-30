@@ -343,7 +343,7 @@ def abbreviate_first_name(name):
     return ' '.join(parts)
 
 
-def find_name_adresse_doubletten(df, organisationen=True, abbreviated_first_name=False):
+def find_name_adresse_doubletten(df, organisationen=True, abbreviated_first_name=False, only_with_Geschaeftspartner=False):
     """
     A cluster here is just any group of organizations with exact match in Name and Adresse (email irrelevant). Used for Doubletten analyses.
     """
@@ -359,6 +359,10 @@ def find_name_adresse_doubletten(df, organisationen=True, abbreviated_first_name
 
     # Keep only groups with at least 2 identical rows
     df = df[df.groupby('cluster_id')['cluster_id'].transform('size') > 1]
+    
+    # If only_with_Geschaeftspartner is True, filter clusters
+    if only_with_Geschaeftspartner:
+        df = df[df.groupby('cluster_id')['Geschaeftspartner_list'].transform(lambda x: x.str.len().max() > 0)]
 
     if organisationen:
         df.sort_values(by='Name_Zeile2', inplace=True)
