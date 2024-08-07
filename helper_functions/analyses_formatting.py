@@ -67,15 +67,17 @@ def set_master_flag(df):
     return result_df
 
 
-def add_organisationsrollen_string_columns(df1, df2):
+def add_organisationsrollen_string_columns(df1, df2, rolle="Organisationsrollen", rolle_id="Organisationrollen_ProduktID"):
     """
     Inputs are df_organisationen and organisationsrollen_df.
     Adds a column "Organisationsrollen", a list where each element is a string like "Inhaber (FDA)"
     and a corresponding column "Organisationrollen_ProduktID" with the corresponding ProduktID for which this organisation is Inhaber.
     """
-    # Initialize the new columns with empty lists
-    df1['Organisationsrollen'] = [[] for _ in range(len(df1))]
-    df1['Organisationrollen_ProduktID'] = [[] for _ in range(len(df1))]
+    # Initialize the new columns with empty lists if they don't exist
+    if rolle not in df1.columns:
+        df1[rolle] = [[] for _ in range(len(df1))]
+    if rolle_id not in df1.columns:
+        df1[rolle_id] = [[] for _ in range(len(df1))]
 
     # Iterate over each row in df1
     for idx, row in df1.iterrows():
@@ -85,8 +87,8 @@ def add_organisationsrollen_string_columns(df1, df2):
             for _, matched_row in matched_rows.iterrows():
                 role = ref_id.split('_')[0]  # Extracts the role from the column name
                 fullid_value = produkte_dict.get(matched_row['FullID'], matched_row['FullID'])
-                df1.at[idx, 'Organisationsrollen'].append(f"{role} ({fullid_value})")
-                df1.at[idx, 'Organisationrollen_ProduktID'].append(matched_row['Produkt_RefID'])
+                df1.at[idx, rolle].append(f"{role} ({fullid_value})")
+                df1.at[idx, rolle_id].append(matched_row['Produkt_RefID'])
 
     return df1
 
