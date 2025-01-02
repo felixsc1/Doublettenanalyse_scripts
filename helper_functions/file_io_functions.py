@@ -38,6 +38,7 @@ def load_data(file_name):
 
 
 def load_processed_data(file_path="data/calculated/personen_organisationen_dfs_processed.pickle"):
+    
     # data_dfs is a dictionary, with keys "personen" and "organisationen" providing the corresponding dataframes.
     try:
         with open(file_path, "rb") as file:

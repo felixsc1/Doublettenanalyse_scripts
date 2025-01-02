@@ -2,7 +2,7 @@ import openpyxl
 import pandas as pd
 import os
 
-from helper_functions.hardcoded_values import produkte_dict_personen, servicerollen
+from helper_functions.hardcoded_values import produkte_dict_personen, servicerollen, produkte_dict
 from .file_io_functions import load_data
 import pickle
 import glob
@@ -359,6 +359,68 @@ def add_personen_produkte_columns(df_data, df_produktrollen):
     return df_data
 
 
+def add_organisationen_produkte_columns(df_data, df_produktrollen):
+    """
+    Can be run after add_personen_produkte_columns()
+    Is actually meant for Personen. 
+    This adds in addition to just Statistikperson etc. also Inhaber, Rechnungsempfänger etc. in the same list in the same columns.
+    """
+    # Creating dictionaries for quick lookup with lists to handle non-unique indices
+    inhaber_dict = (
+        df_produktrollen.groupby("Inhaber_RefID")
+        .apply(lambda x: x.to_dict("records"))
+        .to_dict()
+    )
+    rechnungsempfaenger_dict = (
+        df_produktrollen.groupby("Rechnungsempfaenger_RefID")
+        .apply(lambda x: x.to_dict("records"))
+        .to_dict()
+    )
+    korrespondenzempfaenger_dict = (
+        df_produktrollen.groupby("Korrespondenzempfaenger_RefID")
+        .apply(lambda x: x.to_dict("records"))
+        .to_dict()
+    )
+    
+    # Debug: Check if dictionaries are populated
+    # print(f"Inhaber Dict: {len(inhaber_dict)} entries")
+    # print(f"Rechnungsempfaenger Dict: {len(rechnungsempfaenger_dict)} entries")
+    # print(f"Korrespondenzempfaenger Dict: {len(korrespondenzempfaenger_dict)} entries")
+
+    # Ensure columns exist
+    if "Produkt_rolle" not in df_data.columns:
+        df_data["Produkt_rolle"] = [[] for _ in range(len(df_data))]
+    if "Produkt_RefID" not in df_data.columns:
+        df_data["Produkt_RefID"] = [[] for _ in range(len(df_data))]
+
+    # Iterate over each row in df_data
+    for index, row in df_data.iterrows():
+        reference_id = row["ReferenceID"]
+
+        # Check for matches in dictionaries
+        for ref_dict, role in [
+            (inhaber_dict, "Inhaber"),
+            (rechnungsempfaenger_dict, "Rechnungsempfaenger"),
+            (korrespondenzempfaenger_dict, "Korrespondenzempfaenger"),
+        ]:
+            if reference_id in ref_dict:
+                for produktrollen_row in ref_dict[reference_id]:
+                    # Lookup in dictionary and append role with additional information
+                    full_id = produktrollen_row["FullID"]
+                    additional_info = produkte_dict.get(full_id, "")
+                    role_with_info = (
+                        f"{role} ({additional_info})" if additional_info else role
+                    )
+
+                    df_data.at[index, "Produkt_rolle"].append(role_with_info)
+                    df_data.at[index, "Produkt_RefID"].append(
+                        produktrollen_row["Produkt_RefID"]
+                    )
+                    # print(f"Added {role_with_info} to index {index}")
+
+    return df_data
+
+
 def get_geschaeftspartner(input_df, folder_path):
     """
     Check if input df has matching ReferenceID with any of the other dfs.
@@ -462,7 +524,7 @@ def calculate_scores_organisationen(df):
                 for val in row["Verknuepfungsart_list"]
             ),
             "Geschaeftspartner": sum(100 for _ in row["Geschaeftspartner_list"]),
-            "Produkt_Inhaber": min(row["Produkt_Inhaber"] * 80, 100),
+            "Produkt_Inhaber": min(row["Produkt_Inhaber"] * 80, 200),
             "Produkt_Adressant": min(row["Produkt_Adressant"] * 30, 100),
             "Servicerole": row["Servicerole_count"] * 50,
             "UID_MASTER": 1000 if row["UID_MASTER"] == True else 0
@@ -644,6 +706,7 @@ def raw_cleanup(file_paths_original, raw_data_directory, remove_personen_Sonstig
     df_personen = add_personen_produkte_columns(
         df_personen, df_personenrollen
     )  # Technikperson, Statistikperson, etc.
+    df_personen = add_organisationen_produkte_columns(df_personen, organisationsrollen_df) # Inhaber, Rechnungsempfänger, etc.
 
     # GESCHÄFTSPARTNER
     df_organisationen = get_geschaeftspartner(

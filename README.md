@@ -28,6 +28,16 @@ _organisationen_analysis.ipynb_ For Organisationen
 
 _personen_analysis.ipynb_ For Personen
 
+_other_analysis.ipynb_ For some additional analyses that were not directly related to Doublettenanalyse.
+
 These can be run for example with VS Code (jupyter extension required).
 
-Refer to the comments in the notebooks for more information.
+Refer to the comments in the notebooks for more information. There the individual analyses are explained in more detail.
+Also refer to the Wiki for Details about Expertensuchen.
+
+### Additional notes
+
+To load data (Expertensuchen) modify the variable "raw_data_directory" in the notebooks.
+
+A full analysis workflow involves running the organsiationen_analyses and personen_analysis notebook twice, 
+once with only_with_Geschaeftspartner = False (For analyses that involve BAKOM records and potential Mandanten), and once with only_with_Geschaeftspartner = True (For analyses that contains records ONLY with other Mandanten such as BAZL, BAFU, etc.). Note that in both cases the same files are generated and overwritten (save them in separate folders before re-executing the notebook)

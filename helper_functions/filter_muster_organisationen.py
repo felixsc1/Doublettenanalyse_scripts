@@ -83,6 +83,43 @@ def general_exclusion_criteria_personen(
     return df
 
 
+def filter_clusters_with_mixed_produkt_roles(
+    df, no_Geschaeftspartner=True, no_Servicerole=True
+):
+    """
+    Für DB cleanup step 2, nachdem alle Produktrollen auf einen Master übertragen wurden.
+    Findet Doubletten, bei denen eine Inhaber+Adressant ist (sollte nur noch eine  =Master sein), die anderen Doubletten habe keinerlei Rollen mehr.
+    Achtung: Cluster kann weitere Doubletten enthalten, die noch Rollen haben (z.B. nur Rechnungsempfänger), diese werden nicht angezeigt.
+    """
+    # Apply initial filters to remove entries based on no_Geschaeftspartner and no_Servicerole
+    if no_Geschaeftspartner:
+        df = df[~df["Geschaeftspartner_list"].apply(lambda gp: len(gp) != 0)]
+    if no_Servicerole:
+        df = df[df["Servicerole_count"] == 0]
+
+    def filter_relevant_members(group):
+        # Identify members with both roles > 0
+        has_both_roles = group[
+            (group["Produkt_Inhaber"] > 0) & (group["Produkt_Adressant"] > 0)
+        ]
+        # Identify members with both roles == 0
+        has_zero_roles = group[
+            (group["Produkt_Inhaber"] == 0) & (group["Produkt_Adressant"] == 0)
+        ]
+        # Return relevant members if criteria are met
+        if len(has_both_roles) == 1 and len(has_zero_roles) >= 1:
+            return pd.concat([has_both_roles, has_zero_roles])
+        return pd.DataFrame()
+
+    # Apply the group filter and ensure each group has at least two members
+    filtered_df = df.groupby("cluster_id").apply(filter_relevant_members).reset_index(drop=True)
+    filtered_df = filtered_df[filtered_df.groupby("cluster_id")["cluster_id"].transform("size") >= 2]
+
+    return filtered_df
+
+
+
+
 def FDA_servicerole(df):
     """
     Alle Doubletten haben selbe Versandart.
